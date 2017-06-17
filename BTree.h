@@ -60,6 +60,12 @@ namespace BTreeNS {
         size_t numOfChildren() const {return links_.size();}
 
         bool isNodeFullOfKeys() const {return numOfKeys() == btree_->maxKeys();}
+
+        bool exists(Key);
+
+        int index(BTreeNode::Key key, bool& exists);
+
+
     };
 
     class BTree : public Noncopyable {
@@ -84,7 +90,7 @@ namespace BTreeNS {
         size_t maxKeys() const { return static_cast<size_t>(dim_ * 2 - 1); }
         size_t minKeys() const { return static_cast<size_t>(dim_ - 1); }
         void setRoot(std::shared_ptr<BTreeNode> &ptr) { root = ptr; }
-
+        std::shared_ptr<BTreeNode> getRoot() const {return root;}
     private:
         //for nodes except root, there is at most 2 * dim_ out links and at least dim_ out links.
         int dim_;
