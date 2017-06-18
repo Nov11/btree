@@ -25,7 +25,7 @@ namespace BTreeNS {
     };
     struct P{
         int k;
-        int v;
+//        int v;
         using second_type = int;
         bool operator<(const P& param){
             return k < param.k;
@@ -34,22 +34,22 @@ namespace BTreeNS {
             return k == param.k;
         }
     };
-
+    class BTree;
     struct BTreeNode : public Noncopyable, public std::enable_shared_from_this<BTreeNode> {
         bool isLeaf = true;
         using Key = P;
-        using Value = Key::second_type;
+//        using Value = Key::second_type;
         std::vector<std::shared_ptr<BTreeNode>> links_;
         std::vector<Key> keys_;
         BTree *btree_ = nullptr;
 
         bool search(Key, BTreeNode *, int &index);
 
-        void insert(Key, Value);
+        void insert(Key k);
 
-        void insertNotFull(Key, Value);
+        void insertNotFull(Key k);
 
-        void remove(Key);
+        void removeKey(Key k);
 
         void split(int childIndex);
 
@@ -59,19 +59,16 @@ namespace BTreeNS {
 
         size_t numOfChildren() const {return links_.size();}
 
-        bool isNodeFullOfKeys() const {return numOfKeys() == btree_->maxKeys();}
+        bool isNodeFullOfKeys() const;
 
-        bool exists(Key);
+        bool exists(Key k);
 
-        int index(BTreeNode::Key key, bool& exists);
-
-
+        int index(BTreeNode::Key k, bool& exists);
     };
 
     class BTree : public Noncopyable {
     public:
-        using BTreeNode::Key;
-        using BTreeNode::Value;
+        using Key = P;
 
         BTree(int dim)
                 : dim_(dim) , root(new BTreeNode){
@@ -79,11 +76,11 @@ namespace BTreeNS {
             root->setTree(this);
         }
 
-        void insert(Key, Value);
+        void insert(Key k);
 
-        void remove(Key);
+        void removeKey(Key k);
 
-        bool search(Key, BTreeNode *, int &index);
+        bool search(Key k, BTreeNode *, int &index);
 
         int getDim() const { return dim_; }
 

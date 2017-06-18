@@ -3,18 +3,19 @@
 //
 
 #include "BTree.h"
+#include <algorithm>
 
 namespace BTreeNS {
-    bool BTree::search(BTreeNode::Key key, BTreeNode *result, int &index) {
+    bool BTree::search(BTree::Key key, BTreeNode *result, int &index) {
         return root->search(key, result, index);
     }
 
-    void BTree::remove(BTreeNode::Key key) {
-        root->remove(key);
+    void BTree::removeKey(BTree::Key key) {
+        root->removeKey(key);
     }
 
-    void BTree::insert(BTreeNode::Key key, BTreeNode::Value value) {
-        root->insert(key, value);
+    void BTree::insert(BTree::Key k) {
+        root->insert(k);
     }
 
     bool BTreeNode::search(BTreeNode::Key key, BTreeNode *result, int &index) {
@@ -33,7 +34,7 @@ namespace BTreeNS {
         return links_[i]->search(key, result, index);
     }
 
-    void BTreeNode::insert(BTreeNode::Key key, BTreeNode::Value value) {
+    void BTreeNode::insert(BTreeNode::Key k) {
         //this is root node of btree
         if(keys_.size() == btree_->maxKeys()){
             std::shared_ptr<BTreeNode> newNode(new BTreeNode);
@@ -42,14 +43,14 @@ namespace BTreeNS {
             newNode->links_.push_back(shared_from_this());
             newNode->split(0);
             btree_->setRoot(newNode);
-            newNode->insertNotFull(key, value);
+            newNode->insertNotFull(k);
         }else{
-            insertNotFull(key, value);
+            insertNotFull(k);
         }
     }
 
     void BTreeNode::split(int childIdx) {
-        assert(childIdx >= 0 && childIdx < links_.size());
+        assert(childIdx >= 0 && static_cast<size_t>(childIdx) < links_.size());
         assert(this->keys_.size() < static_cast<size_t>(this->btree_->getDim() * 2 - 1));
         auto node = links_[childIdx];
         assert(node->keys_.size() == static_cast<size_t>(this->btree_->getDim() * 2 - 1));
@@ -76,7 +77,7 @@ namespace BTreeNS {
         links_.insert(links_.begin() + childIdx + 1, newNode);
     }
 
-    void BTreeNode::insertNotFull(BTreeNode::Key key, BTreeNode::Value value) {
+    void BTreeNode::insertNotFull(BTreeNode::Key k) {
         assert(keys_.size() < btree_->maxKeys() && keys_.size() >= btree_->minKeys());
 //        if(isLeaf){
 //            size_t b = 0;
@@ -105,10 +106,10 @@ namespace BTreeNS {
         size_t mid = 0;
         while(b < e){
             mid = b + (e - b) / 2;
-            if(keys_[mid] == key){
-                keys_[mid].v = value;
+            if(keys_[mid] == k){
+                keys_[mid] = k;
                 break;
-            }else if(keys_[mid] < key){
+            }else if(keys_[mid] < k){
                 b = mid + 1;
             }else{
                 e = mid;
@@ -116,25 +117,25 @@ namespace BTreeNS {
         }
         if(b == e){
             if(isLeaf){
-                keys_.insert(keys_.begin() + b, key);
+                keys_.insert(keys_.begin() + b, k);
             }else {
                 //insert into link_[b]
                 auto &node = links_[b];
                 if (node->isNodeFullOfKeys()) {
                     split(b);
-                    if (keys_[b] < key) {
+                    if (keys_[b] < k) {
                         node = links_[b + 1];
                     }
                 }
-                node->insertNotFull(key, value);
+                node->insertNotFull(k);
             }
         }
     }
 
-    void BTreeNode::remove(BTreeNode::Key key) {
+    void BTreeNode::removeKey(BTreeNode::Key key) {
         if(exists(key)){
             if(isLeaf){
-                keys_.erase(remove(keys_.begin(), keys_.end(), key));
+                keys_.erase(std::remove(keys_.begin(), keys_.end(), key), keys_.end());
                 return;
             }else{
                 bool exists;
@@ -146,7 +147,7 @@ namespace BTreeNS {
                     //swap keys
                     using std::swap;
                     swap(*prev->keys_.rbegin(), keys_[idx]);
-                    prev->remove(key);
+                    prev->removeKey(key);
                     return;
                 }else{
                     //exam right child
@@ -155,20 +156,23 @@ namespace BTreeNS {
                     if(postKeyCnt >= btree_->minKeys() + 1){
                         using std::swap;
                         swap(*post->keys_.begin(), keys_[idx]);
-                        post->remove(key);
+                        post->removeKey(key);
                         return;
                     }else{
                         assert((post->isLeaf && prev->isLeaf) || (!post->isLeaf && !prev->isLeaf));
 //                        if(post->isLeaf && prev->isLeaf){
 //                            std::copy(post->keys_.begin(), post->keys_.end(), std::back_inserter(prev->keys_));
 //                        }else{
-                            prev->keys_.push_back(key);
-                            std::copy(post->keys_.begin(), post->keys_.end(), std::back_inserter(prev->keys_));
-                            std::copy(post->links_.begin(), post->links_.end(), std::back_inserter(prev->links_));
-                            keys_.erase(remove(keys_.begin(), keys_.end(), key));
-                            links_.erase(links_.begin() + idx + 1);
-                            prev->remove(key);
-                            return;
+                        prev->keys_.push_back(key);
+                        std::copy(post->keys_.begin(), post->keys_.end(), std::back_inserter(prev->keys_));
+                        std::copy(post->links_.begin(), post->links_.end(), std::back_inserter(prev->links_));
+                        keys_.erase(
+                                std::remove(keys_.begin(), keys_.end(), key)
+                                , keys_.end()
+                        );
+                        links_.erase(links_.begin() + idx + 1);
+                        prev->removeKey(key);
+                        return;
 //                        }
                     }
                 }
@@ -186,7 +190,7 @@ namespace BTreeNS {
             auto& node = links_[idx];
             if(node->numOfKeys() >= btree_->minKeys() + 1){
                 //node has at least minKeys() + 1 keys
-                node->remove(key);
+                node->removeKey(key);
                 return;
             }else{
                 //if one key can be moved from node's previous sibling
@@ -203,12 +207,12 @@ namespace BTreeNS {
                         if(!prev->isLeaf){
                             prev->links_.pop_back();
                         }
-                        node->remove(key);
+                        node->removeKey(key);
                         return;
                     }
                 }
                 //node has previous sibling but sibling has minKeys() key or node has no previous sibling
-                if(idx + 1 < links_.size()){
+                if(static_cast<size_t>(idx + 1) < links_.size()){
                     //it has post sibling
                     auto& post = links_[idx + 1];
                     if(post->numOfKeys() >= btree_->minKeys() + 1){
@@ -221,25 +225,25 @@ namespace BTreeNS {
                         if(!node->isLeaf){
                             post->links_.erase(post->links_.begin());
                         }
-                        node->remove(key);
+                        node->removeKey(key);
                         return;
                     }
                 }
 
                 //siblings has no more than minKeys key in them(or that)
-                if(idx + 1 < links_.size()){
+                if(static_cast<size_t>(idx + 1) < links_.size()){
                     auto& post = links_[idx + 1];
                     node->keys_.push_back(keys_[idx]);
                     node->keys_.insert(node->keys_.begin(), post->keys_.begin(), post->keys_.end());
                     if(!node->isLeaf){
                         node->links_.insert(node->links_.end(), post->links_.begin(), post->links_.end());
                     }
-                    keys_.erase(remove(keys_.begin(), keys_.end(), keys_[idx]));
+                    keys_.erase(std::remove(keys_.begin(), keys_.end(), keys_[idx]), keys_.end());
                     links_.erase(links_.begin() + idx + 1);
-                    if(btree_->getRoot() == this && numOfKeys() == 0){
+                    if(btree_->getRoot().get() == this && numOfKeys() == 0){
                         btree_->setRoot(node);
                     }
-                    node->remove(key);
+                    node->removeKey(key);
                     return;
                 }
                 if(idx + 1 == links_.size()){
@@ -253,10 +257,10 @@ namespace BTreeNS {
                     }
                     keys_.pop_back();
                     links_.pop_back();
-                    if(btree_->getRoot() == this && numOfKeys() == 0){
+                    if(btree_->getRoot().get() == this && numOfKeys() == 0){
                         btree_->setRoot(prev);
                     }
-                    prev->remove(key);
+                    prev->removeKey(key);
                     return;
                 }
             }
@@ -298,5 +302,7 @@ namespace BTreeNS {
         }
         return static_cast<int>(b);
     }
+
+    bool BTreeNode::isNodeFullOfKeys() const {return numOfKeys() == btree_->maxKeys();}
 }
 
